@@ -42,14 +42,14 @@ const ViewModeButton = styled.button<{ $isActive: boolean; $position: 'left' | '
   border: 1px solid;
   transition: all 200ms;
   
-  ${({ $position }) => $position === 'left' 
-    ? 'border-radius: 9999px 0 0 9999px;' 
-    : 'border-radius: 0 9999px 9999px 0; border-left: none;'
+  ${({ $position }) => $position === 'left'
+    ? 'border-radius: 8px 0 0 8px;'
+    : 'border-radius: 0 8px 8px 0; border-left: none;'
   }
-  
+
   &:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px #3b82f6;
+    box-shadow: 0 0 0 2px var(--service-focus);
     position: relative;
     z-index: 1;
   }
@@ -76,7 +76,7 @@ const PaletteSelect = styled.select`
   
   &:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px #3b82f6;
+    box-shadow: 0 0 0 2px var(--service-focus);
   }
 `;
 
@@ -102,7 +102,7 @@ const YearSelect = styled.select`
   
   &:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px #3b82f6;
+    box-shadow: 0 0 0 2px var(--service-focus);
   }
 `;
 
@@ -162,21 +162,21 @@ const SourceFilterButton = styled.button<{ $isSelected: boolean }>`
   gap: 6px;
   padding: 4px 12px 4px 6px;
   font-size: 12px;
-  border-radius: 9999px;
+  border-radius: 8px;
   transition: all 200ms;
   font-weight: ${({ $isSelected }) => $isSelected ? '600' : '400'};
   opacity: ${({ $isSelected }) => $isSelected ? '1' : '0.5'};
   border: 1.5px solid;
   flex: 0 0 auto;
   touch-action: manipulation;
-  
+
   &:hover {
     transform: scale(1.05);
   }
-  
+
   &:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px #3b82f6;
+    box-shadow: 0 0 0 2px var(--service-focus);
   }
 
   @media (max-width: 400px) {
@@ -196,7 +196,7 @@ const ActionButton = styled.button`
   padding: 4px 12px;
   font-size: 12px;
   font-weight: 500;
-  border-radius: 9999px;
+  border-radius: 8px;
   transition: colors 200ms;
   border: none;
   background: transparent;
@@ -213,7 +213,7 @@ const ActionButton = styled.button`
   
   &:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px #3b82f6;
+    box-shadow: 0 0 0 2px var(--service-focus);
   }
 `;
 

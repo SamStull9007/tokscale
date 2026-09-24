@@ -343,7 +343,7 @@ export const SegmentButton = styled.button<{ $active: boolean }>`
   }
 
   @media (max-width: 640px) {
-    min-height: 40px;
+    min-height: 44px;
     padding: 0 12px;
     font-size: 1rem;
   }

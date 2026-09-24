@@ -17,7 +17,7 @@ const TabBarContainer = styled.div`
   display: inline-flex;
   flex-direction: row;
   align-items: center;
-  border-radius: 25px;
+  border-radius: 8px;
   border: 1px solid;
   padding: 6px;
 `;
@@ -26,7 +26,7 @@ const TabButton = styled.button<{ $active?: boolean }>`
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 25px;
+  border-radius: 8px;
   padding-left: 1.25rem;
   padding-right: 1.25rem;
   padding-top: 10px;
@@ -35,7 +35,7 @@ const TabButton = styled.button<{ $active?: boolean }>`
 
   &:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px var(--background, #10121C), 0 0 0 4px #3b82f6;
+    box-shadow: 0 0 0 2px var(--background, #10121C), 0 0 0 4px var(--service-focus);
   }
 
   ${(props) =>

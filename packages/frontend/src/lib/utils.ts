@@ -16,6 +16,7 @@ import type {
   ClientContribution,
   TokenBreakdown,
 } from "./types";
+import { formatContributionDateFull } from "./date-utils";
 
 export function groupByWeek(contributions: DailyContribution[], year: string): WeekData[] {
   const weeks: WeekData[] = [];
@@ -41,6 +42,34 @@ export function groupByWeek(contributions: DailyContribution[], year: string): W
   }
 
   return weeks;
+}
+
+export interface WeekGridDay {
+  day: DailyContribution;
+  weekIndex: number;
+  dayIndex: number;
+}
+
+/** Walks a week/day grid in one direction from a starting cell, skipping empty
+ * (no-data) slots, for arrow-key navigation over a calendar-style grid. */
+export function findDayInDirection(
+  weeksData: WeekData[],
+  fromWeek: number,
+  fromDay: number,
+  deltaWeek: number,
+  deltaDay: number,
+): WeekGridDay | null {
+  let weekIndex = fromWeek;
+  let dayIndex = fromDay;
+  for (;;) {
+    weekIndex += deltaWeek;
+    dayIndex += deltaDay;
+    if (weekIndex < 0 || weekIndex >= weeksData.length || dayIndex < 0 || dayIndex > 6) {
+      return null;
+    }
+    const day = weeksData[weekIndex]?.days[dayIndex];
+    if (day) return { day, weekIndex, dayIndex };
+  }
 }
 
 export function getYearDates(year: string): Date[] {
@@ -226,6 +255,13 @@ function recalculateSummary(
     clients,
     models: Array.from(modelSet),
   };
+}
+
+/** Accessible label for a single contribution day cell, e.g. "March 3, 2026: 12.4K tokens". */
+export function contributionCellLabel(day: DailyContribution): string {
+  const tokens = day.totals.tokens;
+  const tokenLabel = tokens === 1 ? "token" : "tokens";
+  return `${formatContributionDateFull(day)}: ${formatTokenCount(tokens)} ${tokenLabel}`;
 }
 
 export function formatTokenCount(count: number): string {

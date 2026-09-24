@@ -89,11 +89,15 @@ const NavItemBase = styled.a<{ $isActive: boolean }>`
   transition: all 0.2s ease;
   white-space: nowrap;
   min-width: 0;
-  
+
   @media (max-width: 767px) {
     padding: 8px 10px;
   }
-  
+
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
+
   ${({ $isActive }) =>
     $isActive
       ? css`
@@ -105,7 +109,7 @@ const NavItemBase = styled.a<{ $isActive: boolean }>`
     background: transparent;
     border: 1px solid transparent;
     color: #D9D9D9;
-    
+
     &:hover {
       color: #ffffff;
     }
@@ -128,11 +132,15 @@ const NavItemLink = styled(Link)<{ $isActive: boolean }>`
   transition: all 0.2s ease;
   white-space: nowrap;
   min-width: 0;
-  
+
   @media (max-width: 767px) {
     padding: 8px 10px;
   }
-  
+
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
+
   ${({ $isActive }) =>
     $isActive
       ? css`
@@ -184,14 +192,18 @@ const SignInButton = styled.a`
   cursor: pointer;
   transition: opacity 0.15s ease;
   flex-shrink: 0;
-  
+
   &:hover {
     opacity: 0.9;
   }
-  
+
   @media (max-width: 374px) {
     padding: 6px;
     gap: 4px;
+  }
+
+  @media (pointer: coarse) {
+    min-height: 44px;
   }
 `;
 
@@ -242,9 +254,14 @@ const ProfileButton = styled.button`
   overflow: hidden;
   transition: opacity 0.15s ease;
   flex-shrink: 0;
-  
+
   &:hover {
     opacity: 0.9;
+  }
+
+  @media (pointer: coarse) {
+    min-width: 44px;
+    min-height: 44px;
   }
 `;
 

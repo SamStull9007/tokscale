@@ -7,7 +7,7 @@
   --color-bg-active: #0073ff;
 
   --color-text-primary: #ffffff;
-  --color-text-muted: #4b6486;
+  --color-text-muted: #6984a8;
 
   --color-primary: #53d1f3;
   --color-primary-hover: #3bc4e8;
@@ -24,7 +24,7 @@
   --color-canvas-inset: #111113;
   --color-fg-default: #ffffff;
   --color-fg-muted: #7691b7;
-  --color-fg-subtle: #4b6486;
+  --color-fg-subtle: #6984a8;
   --color-border-default: #1e2733;
   --color-border-muted: #1e2733;
   --color-border-subtle: rgba(255, 255, 255, 0.1);
@@ -244,4 +244,21 @@ a:hover {
   color: var(--service-text);
   font-family: var(--font-mono), monospace;
   font-size: 0.8125rem;
+}
+
+/* Project-wide fallback: only ProfileContributionGraph/ProfileEmbedDialog/ProfileTabBar/
+   ProfileOverview/GroupsBrowser opt out per-component today. Collapsing duration to
+   near-zero (not display/visibility) keeps every state change instant and visible —
+   safe here because none of the covered motion (nav menu, switch thumb, hover scale,
+   skeleton/spinner loops, decorative rotation) carries information beyond the state
+   change itself. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

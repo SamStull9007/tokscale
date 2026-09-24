@@ -94,7 +94,7 @@ const ButtonGroup = styled.div`
 
 const PrimaryButton = styled.button`
   padding: 0.75rem 1.5rem; /* px-6 py-3 */
-  border-radius: 9999px; /* rounded-full */
+  border-radius: 8px;
   font-weight: 600; /* font-semibold */
   font-size: 0.875rem; /* text-sm */
   color: white;
@@ -121,7 +121,7 @@ const PrimaryButton = styled.button`
 
 const SecondaryButton = styled.button`
   padding: 0.75rem 1.5rem; /* px-6 py-3 */
-  border-radius: 9999px; /* rounded-full */
+  border-radius: 8px;
   font-weight: 600; /* font-semibold */
   font-size: 0.875rem; /* text-sm */
   transition-property: all;
@@ -266,7 +266,7 @@ export function DataInput({ onDataLoaded }: DataInputProps) {
   return (
     <Container>
       <Header>
-        <Title>
+        <Title id="data-input-heading">
           Load Token Usage Data
         </Title>
         <Description>
@@ -280,6 +280,10 @@ export function DataInput({ onDataLoaded }: DataInputProps) {
 
       <InputWrapper>
         <StyledTextarea
+          id="data-input-textarea"
+          aria-labelledby="data-input-heading"
+          aria-describedby={error ? "data-input-tip data-input-error" : "data-input-tip"}
+          aria-invalid={!!error}
           value={rawJson}
           onChange={(e) => {
             setRawJson(e.target.value);
@@ -294,14 +298,14 @@ export function DataInput({ onDataLoaded }: DataInputProps) {
           placeholder='{"meta": {...}, "summary": {...}, "contributions": [...]}'
           $hasError={!!error}
         />
-        <TipText>
+        <TipText id="data-input-tip">
           Tip: Press Ctrl+Enter (Cmd+Enter on Mac) to parse
         </TipText>
       </InputWrapper>
 
       {error && (
-        <ErrorBox>
-          <ErrorText>
+        <ErrorBox role="alert">
+          <ErrorText id="data-input-error">
             {error}
           </ErrorText>
         </ErrorBox>

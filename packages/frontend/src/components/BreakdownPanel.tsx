@@ -57,7 +57,7 @@ const PanelTitle = styled.h3`
 
 const CloseButton = styled.button`
   padding: 0.5rem;
-  border-radius: 9999px;
+  border-radius: 8px;
   transition: all 200ms;
   flex: 0 0 auto;
   min-height: 44px;
@@ -73,7 +73,7 @@ const CloseButton = styled.button`
 
   &:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px var(--color-bg-default, #fff), 0 0 0 4px #3b82f6;
+    box-shadow: 0 0 0 2px var(--color-bg-default, #fff), 0 0 0 4px var(--service-focus);
   }
 `;
 

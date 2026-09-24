@@ -140,7 +140,7 @@ const CopyrightText = styled.p`
 `;
 
 const GitHubLink = styled.a`
-  color: #3D526C;
+  color: var(--color-fg-muted);
   font-size: 18px;
   font-weight: 500;
   line-height: 1.25;
@@ -148,7 +148,7 @@ const GitHubLink = styled.a`
   transition: color 0.2s ease-in-out;
 
   &:hover {
-    color: #0073FF;
+    color: var(--color-bg-active);
   }
 
   @media (max-width: 560px) {

@@ -1,11 +1,11 @@
 "use client";
 
-import { useRef, useEffect, useCallback, useState, useMemo } from "react";
+import { useRef, useEffect, useCallback, useState, useMemo, useId, type KeyboardEvent } from "react";
 import styled, { keyframes } from "styled-components";
 import type { DailyContribution, GraphColorPalette, TooltipPosition } from "@/lib/types";
 import { getGradeColor } from "@/lib/themes";
 import { useSystemDarkMode } from "@/lib/useMediaQuery";
-import { groupByWeek, hexToNumber, formatCurrency, formatTokenCount } from "@/lib/utils";
+import { groupByWeek, hexToNumber, formatCurrency, formatTokenCount, findDayInDirection, contributionCellLabel } from "@/lib/utils";
 import { formatContributionDate } from "@/lib/date-utils";
 import { CUBE_SIZE, MAX_CUBE_HEIGHT, MIN_CUBE_HEIGHT, ISO_CANVAS_WIDTH, ISO_CANVAS_HEIGHT } from "@/lib/constants";
 
@@ -25,6 +25,34 @@ const LoadingText = styled.div`
   animation: ${pulse} 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 `;
 
+const ErrorState = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+`;
+
+const RetryButton = styled.button`
+  padding: 6px 16px;
+  border: 1px solid;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  transition: background-color 150ms ease;
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--service-focus);
+  }
+`;
+
 const Container = styled.div.attrs({ className: "ic-contributions-wrapper" })`
   position: relative;
   width: 100%;
@@ -35,6 +63,51 @@ const StyledCanvas = styled.canvas`
   width: 100%;
   height: auto;
 `;
+
+const Overlay = styled.div`
+  position: absolute;
+  inset: 0;
+  pointer-events: none; /* the canvas beneath already handles mouse hover/click */
+`;
+
+const CellButton = styled.button`
+  position: absolute;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 2px;
+  cursor: pointer;
+  pointer-events: none; /* the canvas beneath already handles mouse hover/click */
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+  }
+`;
+
+const VisuallyHidden = styled.span`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+`;
+
+/** Approximates obelisk.js's isometric screen projection for placing an
+ * invisible, keyboard-focusable target over each rendered cube — mirrors the
+ * inverse math already used in getDayAtPosition below. */
+function isoCellPercent(weekIndex: number, dayIndex: number): { left: string; top: string } {
+  const x = 130 + weekIndex * CUBE_SIZE * 0.7;
+  const y = 90 + CUBE_SIZE * 0.35 * (dayIndex + weekIndex);
+  return {
+    left: `${(x / ISO_CANVAS_WIDTH) * 100}%`,
+    top: `${(y / ISO_CANVAS_HEIGHT) * 100}%`,
+  };
+}
 
 const TopRightStats = styled.div`
   position: absolute;
@@ -150,23 +223,55 @@ export function TokenGraph3D({
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [obeliskLoaded, setObeliskLoaded] = useState(false);
+  const [obeliskError, setObeliskError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const obeliskRef = useRef<any>(null);
+  const cellRefs = useRef(new Map<string, HTMLButtonElement>());
+  const summaryId = useId();
+  const [focusedDate, setFocusedDate] = useState<string | null>(null);
   const weeksData = useMemo(() => groupByWeek(contributions, year), [contributions, year]);
   const isDark = useSystemDarkMode();
 
+  const days = useMemo(
+    () =>
+      weeksData.flatMap((week, weekIndex) =>
+        week.days.flatMap((day, dayIndex) => (day ? [{ day, weekIndex, dayIndex }] : [])),
+      ),
+    [weeksData],
+  );
+  const activeFocusDate =
+    focusedDate && days.some(({ day }) => day.date === focusedDate)
+      ? focusedDate
+      : (bestDay?.date ?? days.at(-1)?.day.date ?? null);
+  const summaryText =
+    activeDays === 0
+      ? "No contribution activity in this range."
+      : `${activeDays.toLocaleString("en-US")} active ${activeDays === 1 ? "day" : "days"}. Highest activity: ${
+          bestDay ? contributionCellLabel(bestDay) : "none"
+        }.`;
+
   useEffect(() => {
+    let cancelled = false;
+
     async function loadObelisk() {
+      setObeliskError(false);
       try {
         const obeliskModule = await import("obelisk.js");
+        if (cancelled) return;
         obeliskRef.current = obeliskModule.default || obeliskModule;
         setObeliskLoaded(true);
       } catch (err) {
         console.error("Failed to load obelisk.js:", err);
+        if (!cancelled) setObeliskError(true);
       }
     }
     loadObelisk();
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [retryCount]);
 
   useEffect(() => {
     if (!obeliskLoaded || !obeliskRef.current) return;
@@ -269,13 +374,77 @@ export function TokenGraph3D({
     [getDayAtPosition, onDayClick]
   );
 
+  const handleCellFocus = useCallback(
+    (day: DailyContribution, event: React.FocusEvent<HTMLButtonElement>) => {
+      setFocusedDate(day.date);
+      const rect = event.currentTarget.getBoundingClientRect();
+      onDayHover(day, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+    },
+    [onDayHover]
+  );
+
+  const handleCellKeyDown = useCallback(
+    (day: DailyContribution, weekIndex: number, dayIndex: number, event: KeyboardEvent<HTMLButtonElement>) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        onDayClick(day);
+        return;
+      }
+
+      let target: { day: DailyContribution; weekIndex: number; dayIndex: number } | null = null;
+      switch (event.key) {
+        case "ArrowLeft":
+          target = findDayInDirection(weeksData, weekIndex, dayIndex, -1, 0);
+          break;
+        case "ArrowRight":
+          target = findDayInDirection(weeksData, weekIndex, dayIndex, 1, 0);
+          break;
+        case "ArrowUp":
+          target = findDayInDirection(weeksData, weekIndex, dayIndex, 0, -1);
+          break;
+        case "ArrowDown":
+          target = findDayInDirection(weeksData, weekIndex, dayIndex, 0, 1);
+          break;
+        case "Home":
+          target = days[0] ?? null;
+          break;
+        case "End":
+          target = days.at(-1) ?? null;
+          break;
+        default:
+          return;
+      }
+
+      event.preventDefault();
+      if (!target) return;
+      setFocusedDate(target.day.date);
+      cellRefs.current.get(target.day.date)?.focus();
+    },
+    [weeksData, days]
+  );
+
   if (!obeliskLoaded) {
     return (
       <LoadingContainer
         ref={containerRef}
         style={{ aspectRatio: `${ISO_CANVAS_WIDTH} / ${ISO_CANVAS_HEIGHT}`, backgroundColor: isDark ? "#10121C" : "#FFFFFF" }}
       >
-        <LoadingText style={{ color: isDark ? "#4B6486" : "#656D76" }}>Loading 3D view...</LoadingText>
+        {obeliskError ? (
+          <ErrorState role="alert">
+            <LoadingText style={{ color: isDark ? "#4B6486" : "#656D76", animation: "none" }}>
+              Couldn&rsquo;t load the 3D view.
+            </LoadingText>
+            <RetryButton
+              type="button"
+              style={{ color: isDark ? "#FFFFFF" : "#1F2328", borderColor: isDark ? "#1E2733" : "#D0D7DE" }}
+              onClick={() => setRetryCount((count) => count + 1)}
+            >
+              Retry
+            </RetryButton>
+          </ErrorState>
+        ) : (
+          <LoadingText style={{ color: isDark ? "#4B6486" : "#656D76" }}>Loading 3D view...</LoadingText>
+        )}
       </LoadingContainer>
     );
   }
@@ -289,6 +458,27 @@ export function TokenGraph3D({
         onClick={handleClick}
         style={{ aspectRatio: `${ISO_CANVAS_WIDTH} / ${ISO_CANVAS_HEIGHT}` }}
       />
+      <Overlay>
+        {days.map(({ day, weekIndex, dayIndex }) => (
+          <CellButton
+            key={day.date}
+            ref={(node) => {
+              if (node) cellRefs.current.set(day.date, node);
+              else cellRefs.current.delete(day.date);
+            }}
+            type="button"
+            tabIndex={day.date === activeFocusDate ? 0 : -1}
+            aria-label={contributionCellLabel(day)}
+            style={{ ...isoCellPercent(weekIndex, dayIndex), width: 10, height: 10 }}
+            onFocus={(event) => handleCellFocus(day, event)}
+            onBlur={() => onDayHover(null, null)}
+            onKeyDown={(event) => handleCellKeyDown(day, weekIndex, dayIndex, event)}
+          />
+        ))}
+      </Overlay>
+      <VisuallyHidden id={summaryId} aria-live="polite">
+        {summaryText}
+      </VisuallyHidden>
 
       <TopRightStats>
         <StatsTitle style={{ color: isDark ? "#FFFFFF" : "#1F2328" }}>Token Usage</StatsTitle>

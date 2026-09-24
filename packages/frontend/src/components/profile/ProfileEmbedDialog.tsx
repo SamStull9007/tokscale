@@ -682,6 +682,11 @@ const CloseButton = styled.button`
     background-color 150ms ease,
     color 150ms ease;
 
+  @media (pointer: coarse) {
+    width: 44px;
+    height: 44px;
+  }
+
   &:focus-visible {
     outline: 2px solid var(--service-focus);
     outline-offset: 2px;

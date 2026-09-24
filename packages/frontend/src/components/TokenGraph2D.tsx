@@ -1,20 +1,55 @@
 "use client";
 
-import { useRef, useEffect, useCallback, useMemo } from "react";
+import { useRef, useEffect, useCallback, useMemo, useState, useId, type KeyboardEvent } from "react";
 import styled from "styled-components";
 import type { DailyContribution, GraphColorPalette, TooltipPosition } from "@/lib/types";
 import { getGradeColor } from "@/lib/themes";
-import { groupByWeek } from "@/lib/utils";
+import { groupByWeek, findDayInDirection, contributionCellLabel } from "@/lib/utils";
 import { useSystemDarkMode } from "@/lib/useMediaQuery";
 import { BOX_WIDTH, CELL_SIZE, CANVAS_MARGIN, HEADER_HEIGHT, TEXT_HEIGHT, FONT_SIZE, FONT_FAMILY, DAY_LABELS_SHORT, MONTH_LABELS_SHORT } from "@/lib/constants";
 import { parseISO, getMonth } from "date-fns";
 
 const Container = styled.div`
+  position: relative;
   overflow-x: auto;
 `;
 
 const GraphCanvas = styled.canvas`
   cursor: pointer;
+`;
+
+const Overlay = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none; /* the canvas beneath already handles mouse hover/click */
+`;
+
+const CellButton = styled.button`
+  position: absolute;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 2px;
+  cursor: pointer;
+  pointer-events: none; /* the canvas beneath already handles mouse hover/click */
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+  }
+`;
+
+const VisuallyHidden = styled.span`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 `;
 
 interface TokenGraph2DProps {
@@ -27,8 +62,34 @@ interface TokenGraph2DProps {
 
 export function TokenGraph2D({ contributions, palette, year, onDayHover, onDayClick }: TokenGraph2DProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const cellRefs = useRef(new Map<string, HTMLButtonElement>());
+  const summaryId = useId();
+  const [focusedDate, setFocusedDate] = useState<string | null>(null);
   const weeksData = useMemo(() => groupByWeek(contributions, year), [contributions, year]);
   const isDark = useSystemDarkMode();
+
+  const days = useMemo(
+    () =>
+      weeksData.flatMap((week, weekIndex) =>
+        week.days.flatMap((day, dayIndex) => (day ? [{ day, weekIndex, dayIndex }] : [])),
+      ),
+    [weeksData],
+  );
+  const activeFocusDate =
+    focusedDate && days.some(({ day }) => day.date === focusedDate)
+      ? focusedDate
+      : (days.at(-1)?.day.date ?? null);
+  const activeDays = days.filter(({ day }) => day.totals.tokens > 0);
+  const highestDay = activeDays.reduce<DailyContribution | null>(
+    (highest, { day }) => (!highest || day.totals.tokens > highest.totals.tokens ? day : highest),
+    null,
+  );
+  const summaryText =
+    activeDays.length === 0
+      ? "No contribution activity in this range."
+      : `${activeDays.length.toLocaleString("en-US")} active ${activeDays.length === 1 ? "day" : "days"}. Highest activity: ${
+          highestDay ? contributionCellLabel(highestDay) : "none"
+        }.`;
 
   const getCSSVar = (varName: string): string => {
     if (typeof window === "undefined") return "";
@@ -147,6 +208,55 @@ export function TokenGraph2D({ contributions, palette, year, onDayHover, onDayCl
     [getDayAtPosition, onDayClick]
   );
 
+  const handleCellFocus = useCallback(
+    (day: DailyContribution, event: React.FocusEvent<HTMLButtonElement>) => {
+      setFocusedDate(day.date);
+      const rect = event.currentTarget.getBoundingClientRect();
+      onDayHover(day, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+    },
+    [onDayHover]
+  );
+
+  const handleCellKeyDown = useCallback(
+    (day: DailyContribution, weekIndex: number, dayIndex: number, event: KeyboardEvent<HTMLButtonElement>) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        onDayClick(day);
+        return;
+      }
+
+      let target: { day: DailyContribution; weekIndex: number; dayIndex: number } | null = null;
+      switch (event.key) {
+        case "ArrowLeft":
+          target = findDayInDirection(weeksData, weekIndex, dayIndex, -1, 0);
+          break;
+        case "ArrowRight":
+          target = findDayInDirection(weeksData, weekIndex, dayIndex, 1, 0);
+          break;
+        case "ArrowUp":
+          target = findDayInDirection(weeksData, weekIndex, dayIndex, 0, -1);
+          break;
+        case "ArrowDown":
+          target = findDayInDirection(weeksData, weekIndex, dayIndex, 0, 1);
+          break;
+        case "Home":
+          target = days[0] ?? null;
+          break;
+        case "End":
+          target = days.at(-1) ?? null;
+          break;
+        default:
+          return;
+      }
+
+      event.preventDefault();
+      if (!target) return;
+      setFocusedDate(target.day.date);
+      cellRefs.current.get(target.day.date)?.focus();
+    },
+    [weeksData, days]
+  );
+
   return (
     <Container>
       <GraphCanvas
@@ -156,6 +266,32 @@ export function TokenGraph2D({ contributions, palette, year, onDayHover, onDayCl
         onClick={handleClick}
         style={{ minWidth: canvasWidth }}
       />
+      <Overlay style={{ width: canvasWidth, height: canvasHeight }}>
+        {days.map(({ day, weekIndex, dayIndex }) => (
+          <CellButton
+            key={day.date}
+            ref={(node) => {
+              if (node) cellRefs.current.set(day.date, node);
+              else cellRefs.current.delete(day.date);
+            }}
+            type="button"
+            tabIndex={day.date === activeFocusDate ? 0 : -1}
+            aria-label={contributionCellLabel(day)}
+            style={{
+              left: CANVAS_MARGIN + TEXT_HEIGHT + weekIndex * CELL_SIZE,
+              top: HEADER_HEIGHT + dayIndex * CELL_SIZE,
+              width: BOX_WIDTH,
+              height: BOX_WIDTH,
+            }}
+            onFocus={(event) => handleCellFocus(day, event)}
+            onBlur={() => onDayHover(null, null)}
+            onKeyDown={(event) => handleCellKeyDown(day, weekIndex, dayIndex, event)}
+          />
+        ))}
+      </Overlay>
+      <VisuallyHidden id={summaryId} aria-live="polite">
+        {summaryText}
+      </VisuallyHidden>
     </Container>
   );
 }

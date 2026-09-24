@@ -430,10 +430,8 @@ const CommandPrefix = styled.span`
 
 const CommandName = styled.span`
   flex: 0 0 auto;
-  background: linear-gradient(90deg, #0CF 0%, #0073FF 100%);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--color-primary);
+  font-weight: 600;
 `;
 
 const CommandArg = styled.span`
