@@ -362,7 +362,7 @@ fn parse_billing_json_object(value: &Value) -> Option<UsageMetric> {
         label: cycle_label(start.as_deref(), end.as_deref()),
         used_percent: percent,
         remaining_percent: 100.0 - percent,
-        remaining_label,
+        remaining_label: remaining_label.or_else(|| Some(format!("{:.0}% left", 100.0 - percent))),
         resets_at: end,
     })
 }
@@ -534,7 +534,7 @@ fn parse_billing_config_proto(data: &[u8]) -> Option<UsageMetric> {
         label: cycle_label(start.as_deref(), end.as_deref()),
         used_percent: percent,
         remaining_percent: 100.0 - percent,
-        remaining_label: None,
+        remaining_label: Some(format!("{:.0}% left", 100.0 - percent)),
         resets_at: end,
     })
 }
@@ -767,6 +767,26 @@ mod tests {
     }
 
     #[test]
+    fn parses_unified_weekly_credit_usage_percent() {
+        let value = serde_json::json!({
+            "creditUsagePercent": 9.0,
+            "currentPeriod": {
+                "type": "USAGE_PERIOD_TYPE_WEEKLY",
+                "start": "2026-10-26T01:34:33.464+00:00",
+                "end": "2026-11-02T01:34:33.464+00:00"
+            },
+            "billingPeriodStart": "2026-10-26T01:34:33.464+00:00",
+            "billingPeriodEnd": "2026-11-02T01:34:33.464+00:00"
+        });
+
+        let metric = parse_billing_json_metric(&value).expect("billing metric");
+        assert_eq!(metric.label, "Weekly");
+        assert_eq!(metric.used_percent, 9.0);
+        assert_eq!(metric.remaining_percent, 91.0);
+        assert_eq!(metric.remaining_label.as_deref(), Some("91% left"));
+    }
+
+    #[test]
     fn rejects_non_finite_billing_json_percentages() {
         for value in [
             serde_json::json!({ "usedPercent": "NaN" }),
@@ -822,6 +842,7 @@ mod tests {
         let metric = parse_grpc_billing_metric(&frame).expect("billing metric");
         assert_eq!(metric.label, "Monthly");
         assert_eq!(metric.used_percent, 25.0);
+        assert_eq!(metric.remaining_label.as_deref(), Some("75% left"));
         assert_eq!(
             metric.resets_at.as_deref(),
             Some("2026-07-01T00:00:00+00:00")
